@@ -14,17 +14,22 @@ const int WIDTH = 1000, HEIGHT = 800;
 // variabes and constants
 
 const float gravity  = 0.1;
-bool g_on = false;
-const float velMultiplier = 1;
-const int forceFactor = 100;
+
+const float velMultiplier = 10;
+const int forceFactor = 1000;
 const float airRes = 0.98;
 const float dampingFactor = 0.8;
 const int nParticles =  20000;
-bool Push = false;
+
+bool g_on = false;
+bool Push = false; 
 bool Pull = false;
 bool running = true;
+bool collide = false;
 int force_equation = 0;
-SDL_Rect box;
+
+
+
 
 int cursorX, cursorY;
 
@@ -39,40 +44,11 @@ int frameCounter = 0;
 SDL_Window *window = SDL_CreateWindow( "BALLS", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_ALLOW_HIGHDPI );
 SDL_Renderer *renderer = SDL_CreateRenderer( window, -1, 0 );
 
-
-
-/*SDL_Texture* renderText(const std::string &message, const std::string &fontFile,
-	SDL_Color color, int fontSize, SDL_Renderer *renderer)
-{
-
-    if (TTF_Init() < 0)
-    {
-        printf("Couldn't initialize SDL TTF: %s\n", SDL_GetError());
-        exit(1);
-    }
-    
-	//Open the font
-	TTF_Font *font = TTF_OpenFont(fontFile.c_str(), fontSize);
-	
-    //We need to first render to a surface as that's what TTF_RenderText
-	//returns, then load that surface into a texture
-	SDL_Surface *surf = TTF_RenderText_Blended(font, message.c_str(), color);
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surf);
-	
-	//Clean up the surface and font
-	SDL_FreeSurface(surf);
-	TTF_CloseFont(font);
-	return texture;
-}*/
-class button
-{
-
+class Button {
     public:
     SDL_Rect rect;
-    SDL_Colour colour_on = {0, 255, 0};
-    
-
-
+    int r = 255, g = 255, b = 255;
+    int a = 255;
 };
 
 class particle {       
@@ -87,32 +63,38 @@ class particle {
     int mass = 1;
    
 };
+SDL_Rect box;
+particle p[nParticles];
 
-particle p[nParticles]; 
+Button refreshB;
+
 void initalize()
 {
    	
-   SDL_Init( SDL_INIT_EVERYTHING );
+    SDL_Init( SDL_INIT_EVERYTHING );
   
-    if ( NULL == window )
-    {
+
+    if ( NULL == window ){
         std::cout << "Could not create window: " << SDL_GetError( ) << std::endl;
         return;
     }
-
     
-
-    box.w = 500;
-    box.h = 500;
-    box.x = WIDTH/2 - 250;
+    //set container box
+    box.w = 1000;
+    box.h = 800;
+    box.x = WIDTH/2 - box.w/2;
     box.y = HEIGHT/2 - box.h/2 ;
+    
+    // set refresh button
+    refreshB.rect.x = 900;
+    refreshB.rect.y = 200;
+    refreshB.rect.w = 50;
+    refreshB.rect.h = 25;
 
     Push = false;
     Pull = false;
 
-
-    for(int i = 0; i<nParticles; i++)
-    {
+    for(int i = 0; i<nParticles; i++){
         p[i].xPos = box.w/2 + box.x;
         p[i].yPos = HEIGHT/2;
 
@@ -132,6 +114,19 @@ void checkEvents()
     {
         // get the curser position
         SDL_GetMouseState( &cursorX, &cursorY );
+
+        if(cursorX >= refreshB.rect.x && cursorX <= refreshB.rect.x + refreshB.rect.w && cursorY >=refreshB.rect.y && cursorY <= refreshB.rect.y + refreshB.rect.h ){
+            refreshB.r = 0;
+            refreshB.g = 255;
+            refreshB.b = 0;
+        }
+
+        else{
+            refreshB.r = 255;
+            refreshB.g = 255;
+            refreshB.b = 255;
+        }
+
 
         switch (event.type){
 
@@ -164,14 +159,26 @@ void checkEvents()
                 case SDLK_2:
                     force_equation = 2;
                     break;
+                    
+                case SDLK_c:
+                collide ^= true;
+                break;
+                
+                
     
                 }
 
             case SDL_MOUSEBUTTONDOWN:
              
                 if (event.button.button == SDL_BUTTON_LEFT){
-                    Pull = true;
-                    Push = false;
+                    if(cursorX >= refreshB.rect.x && cursorX <= refreshB.rect.x + refreshB.rect.w && cursorY >=refreshB.rect.y && cursorY <= refreshB.rect.y + refreshB.rect.h ){
+                        initalize();
+                    }
+                    else{
+                        Pull = true;
+                        Push = false;  
+                    }
+                    
                 }
 
                 else if (event.button.button == SDL_BUTTON_RIGHT)
@@ -203,7 +210,7 @@ void update()
                 break;
             
             case 1:
-                applied_force =  (forceFactor* 0.000001)*(pow(sqrt(pow(deltaX,2) + pow(deltaY, 2)),2));
+                applied_force =  (forceFactor*0.0000001)*(pow(sqrt(pow(deltaX,2) + pow(deltaY, 2)),2));
                 break;
             case 2: 
                 applied_force = forceFactor/(pow(sqrt(pow(deltaX,2) + pow(deltaY, 2)),2));
@@ -277,8 +284,30 @@ void update()
             p[i].xPos = box.x ;
             p[i].xVel = -dampingFactor * p[i].xVel;
         }
+
+        if (collide){
+          for(int i = 0; i<nParticles; i++){
+
+            for(int j = 0; j<nParticles; j++){
+                
+                if(j != i && (p[j].xPos == p[i].xPos) && (p[j].yPos == p[i].yPos))
+                {
+                   
+                    cout<< "collide" << endl;
+                
+                    p[j].xVel  = -dampingFactor * p[j].xVel;
+                    p[j].yVel = -dampingFactor*p[j].yVel;
+
+                    
+
+                }
+        
+                
+            }  
+            }
+        }
         // colour
-        float speed = (sqrt(pow(p[i].xVel/velMultiplier,2) + pow(p[i].yVel/velMultiplier,2)))/sqrt(2) ;
+        float speed = (sqrt(pow(p[i].xVel,2) + pow(p[i].yVel,2)))/sqrt(2) ;
         p[i].particleR= speed * 255;
         p[i].particleB = 255 - (speed * 255); 
 
@@ -296,11 +325,11 @@ void update()
     
 void draw()
 {
+    // background
     SDL_SetRenderDrawColor( renderer, 0,0,0, 255 );
     SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor( renderer, 255, 255, 255, 255 );
-    SDL_RenderDrawRect(renderer, &box);
-
+    
+    // points
     for(int i = 0; i < nParticles; i++)
     {
         SDL_SetRenderDrawColor( renderer, p[i].particleR, p[i].particleG, p[i].particleB, 255 );
@@ -309,12 +338,21 @@ void draw()
         //SDL_RenderDrawPoint(renderer, p[i].xPos+1, p[i].yPos);
         //SDL_RenderDrawPoint(renderer, p[i].xPos +1, p[i].yPos +1);
     }
-   
+    //box
+    SDL_SetRenderDrawColor( renderer, 255, 255, 255, 255 );
+    SDL_RenderDrawRect(renderer, &box);
+    
+    //buttons
+    SDL_SetRenderDrawColor( renderer, refreshB.r, refreshB.g, refreshB.b, refreshB.a );
+    SDL_RenderDrawRect(renderer, &refreshB.rect);
+
+    
+
+    
+
     SDL_RenderPresent(renderer);
 }
 
-
-    
 
 int main( int argc, char *argv[] )
 {
@@ -334,7 +372,7 @@ int main( int argc, char *argv[] )
         Uint64 end = SDL_GetPerformanceCounter();
         
         Deltatime = (end - start) / (float)SDL_GetPerformanceFrequency() * 1000.0f;
-        cout << 1000/Deltatime << endl;
+        std:cout << 1000/Deltatime << endl;
         
         //------------------------------
     }
